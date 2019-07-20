@@ -5,6 +5,7 @@
 
 umask "${PASSWORD_STORE_UMASK:-077}"
 set -o pipefail
+[[ -t 1 ]] && YES_TTY=1
 
 GPG_OPTS=( $PASSWORD_STORE_GPG_OPTS "--quiet" "--yes" "--compress-algo=none" "--no-encrypt-to" )
 GPG="gpg"
@@ -396,11 +397,17 @@ cmd_show() {
 		fi
 	elif [[ -d $PREFIX/$path ]]; then
 		if [[ -z $path ]]; then
-			echo "Password Store"
+			if [[ $YES_TTY -eq 1 ]] ; then
+				echo "Password Store"
+			fi
 		else
 			echo "${path%\/}"
 		fi
-		tree -C -l --noreport "$PREFIX/$path" | tail -n +2 | sed -E 's/\.gpg(\x1B\[[0-9]+m)?( ->|$)/\1\2/g' # remove .gpg at end of line, but keep colors
+		if [[ -z $YES_TTY ]] ; then
+			find "$PREFIX/$path" -type f -iname \*.gpg | sed -e 's/\.gpg$//g' -e "s,^$PREFIX,,g" -e 's/^\///g' # when non-interactive (pipeline) print full-path-per-entry (for easy copy/paste or filtering)
+		else
+			tree -C -l --noreport "$PREFIX/$path" | tail -n +2 | sed -E 's/\.gpg(\x1B\[[0-9]+m)?( ->|$)/\1\2/g' # remove .gpg at end of line, but keep colors
+		fi
 	elif [[ -z $path ]]; then
 		die "Error: password store is empty. Try \"pass init\"."
 	else
